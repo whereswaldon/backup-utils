@@ -31,6 +31,7 @@ set -e
 # Parse arguments
 restore_settings=false
 force=false
+: ${GHE_RESTORE_STAGE:=stage1}
 while true; do
   case "$1" in
     -f|--force)
@@ -94,6 +95,7 @@ hostname=$(echo "$GHE_HOSTNAME" | cut -f 1 -d :)
 GHE_RESTORE_SNAPSHOT_PATH="$(ghe-restore-snapshot-path "$snapshot_id")"
 GHE_RESTORE_SNAPSHOT=$(basename "$GHE_RESTORE_SNAPSHOT_PATH")
 export GHE_RESTORE_SNAPSHOT
+
 
 # Detect if the backup we are restoring has a leaked ssh key
 echo "Checking for leaked keys in the backup snapshot that is being restored ..."
@@ -270,26 +272,28 @@ bm_start "ghe-import-redis"
 ghe-ssh "$GHE_HOSTNAME" -- 'ghe-import-redis' < "$GHE_RESTORE_SNAPSHOT_PATH/redis.rdb" 1>&3
 bm_end "ghe-import-redis"
 
-# Unified and enhanced restore method to 2.13.0 and newer
-if $CLUSTER || [ "$(version $GHE_REMOTE_VERSION)" -ge "$(version 2.13.0)" ]; then
-  echo "Restoring Git repositories ..."
-  ghe-restore-repositories "$GHE_HOSTNAME" 1>&3
+if $GHE_RESTORE_STAGE == "stage1"; then
+  echo "Restoring SSH authorized keys ..."
+  ghe-ssh "$GHE_HOSTNAME" -- 'ghe-import-authorized-keys' < "$GHE_RESTORE_SNAPSHOT_PATH/authorized-keys.json" 1>&3
+elif $GHE_RESTORE_STAGE == "stage2"; then
+  # Unified and enhanced restore method to 2.13.0 and newer
+  if $CLUSTER || [ "$(version $GHE_REMOTE_VERSION)" -ge "$(version 2.13.0)" ]; then
+    echo "Restoring Git repositories ..."
+    ghe-restore-repositories "$GHE_HOSTNAME" 1>&3
 
-  echo "Restoring Gists ..."
-  ghe-restore-repositories-gist "$GHE_HOSTNAME" 1>&3
-else
-  echo "Restoring Git repositories and Gists ..."
-  ghe-restore-repositories-rsync "$GHE_HOSTNAME" 1>&3
+    echo "Restoring Gists ..."
+    ghe-restore-repositories-gist "$GHE_HOSTNAME" 1>&3
+  else
+    echo "Restoring Git repositories and Gists ..."
+    ghe-restore-repositories-rsync "$GHE_HOSTNAME" 1>&3
+  fi
+
+  echo "Restoring GitHub Pages ..."
+  ghe-restore-pages "$GHE_HOSTNAME" 1>&3
+
+  echo "Restoring storage data ..."
+  ghe-restore-storage "$GHE_HOSTNAME" 1>&3
 fi
-
-echo "Restoring GitHub Pages ..."
-ghe-restore-pages "$GHE_HOSTNAME" 1>&3
-
-echo "Restoring SSH authorized keys ..."
-ghe-ssh "$GHE_HOSTNAME" -- 'ghe-import-authorized-keys' < "$GHE_RESTORE_SNAPSHOT_PATH/authorized-keys.json" 1>&3
-
-echo "Restoring storage data ..."
-ghe-restore-storage "$GHE_HOSTNAME" 1>&3
 
 echo "Restoring custom Git hooks ..."
 ghe-restore-git-hooks "$GHE_HOSTNAME" 1>&3
@@ -340,7 +344,6 @@ else
     echo "* Warning: Failed to start cron"
   fi
 fi
-
 
 # Update the remote status to "complete". This has to happen before importing
 # ssh host keys because subsequent commands will fail due to the host key
