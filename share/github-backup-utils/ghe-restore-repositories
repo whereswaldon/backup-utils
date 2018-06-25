@@ -22,7 +22,7 @@ GHE_HOSTNAME="$1"
 # us run this script directly.
 : ${GHE_RESTORE_SNAPSHOT:=current}
 
-network_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find repositories -mindepth 6 -maxdepth 7 -name \*.git -exec dirname {} \; | uniq | grep nw | cut -d / -f2-)
+network_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find -H repositories -mindepth 6 -maxdepth 7 -name \*.git -exec dirname {} \; | uniq | grep nw | cut -d / -f2-)
 
 if [ -z "$network_paths" ]; then
   echo "Warning: Repositories backup missing. Skipping ..."
