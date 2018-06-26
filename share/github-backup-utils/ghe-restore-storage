@@ -24,9 +24,9 @@ GHE_HOSTNAME="$1"
 : ${GHE_RESTORE_SNAPSHOT:=current}
 
 # Find the objects to restore
-# 20590 storage/d/da/5c/da5c7275ae360ef22756d5621ebb7853dea5869187274fcf2109ec70e9b9fd85
-# 1904640 storage/d/da/5c/da5ce86bcf54e3fadc75105e9bd734fccaaf64144dbd470dd40519a1c6efdf65
-storage_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find -H storage -mindepth 4 -maxdepth 4 -type f -exec wc -c {} \;)
+# storage/d/da/5c/da5c7275ae360ef22756d5621ebb7853dea5869187274fcf2109ec70e9b9fd85
+# storage/d/da/5c/da5ce86bcf54e3fadc75105e9bd734fccaaf64144dbd470dd40519a1c6efdf65
+storage_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find -H storage -mindepth 4 -maxdepth 4 -type f)
 
 # No need to restore anything, early exit
 if [ -z "$storage_paths" ]; then
