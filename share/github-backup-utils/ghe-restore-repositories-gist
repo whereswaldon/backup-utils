@@ -79,8 +79,8 @@ bm_start "$(basename $0) - Building gist list"
 OLDIFS=$IFS; IFS=$'\n'
 for path in $gist_paths; do
   ghe_verbose "* Adding gist $path to the list of networks to send"
-  echo "$path $GHE_REMOTE_GIT_DATA_NODES"
-done > $local_routes_list
+  echo $path
+done > $tmp_list
 IFS=$OLDIFS
 bm_end "$(basename $0) - Building gist list"
 
@@ -98,24 +98,24 @@ bm_end "$(basename $0) - Building gist list"
 # NOTE: The route generation is performed on the appliance as it is considerably
 # more performant than performing over an SSH pipe.
 #
-# bm_start "$(basename $0) - Transferring gist list"
-# cat $tmp_list | ghe-ssh "$GHE_HOSTNAME" -- sponge $tmp_list
-# ghe_debug "\n$(cat $tmp_list)"
-# bm_end "$(basename $0) - Transferring gist list"
+bm_start "$(basename $0) - Transferring gist list"
+cat $tmp_list | ghe-ssh "$GHE_HOSTNAME" -- sponge $tmp_list
+ghe_debug "\n$(cat $tmp_list)"
+bm_end "$(basename $0) - Transferring gist list"
 
-# bm_start "$(basename $0) - Generating routes"
-# echo "cat $tmp_list | github-env ./bin/gist-cluster-restore-routes > $routes_list" | ghe-ssh "$GHE_HOSTNAME" -- /bin/bash
-# ghe_debug "\n$(ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list)"
-# bm_end "$(basename $0) - Generating routes"
+bm_start "$(basename $0) - Generating routes"
+echo "cat $tmp_list | github-env ./bin/gist-cluster-restore-routes > $routes_list" | ghe-ssh "$GHE_HOSTNAME" -- /bin/bash
+ghe_debug "\n$(ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list)"
+bm_end "$(basename $0) - Generating routes"
 
-# bm_start "$(basename $0) - Transferring routes"
-# ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list > $local_routes_list
-# ghe_debug "\n$(cat $local_routes_list)"
-# bm_end "$(basename $0) - Transferring routes"
+bm_start "$(basename $0) - Transferring routes"
+ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list > $local_routes_list
+ghe_debug "\n$(cat $local_routes_list)"
+bm_end "$(basename $0) - Transferring routes"
 
 bm_start "$(basename $0) - Processing routes"
 # cat $local_routes_list | awk -v tempdir="$tempdir" '{ for(i=2;i<=NF;i++){ print $1 > (tempdir"/"$i".rsync") }}'
-cat $local_routes_list | awk '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); printf i " /data/repositories/" $1; $1=""; print $0}' > $to_restore
+cat $local_routes_list | awk -v nodes="$GHE_REMOTE_GIT_DATA_NODES" '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); printf i " /data/repositories/" $1 " " nodes}' > $to_restore
 ghe_debug "\n$(cat $to_restore)"
 bm_end "$(basename $0) - Processing routes"
 
