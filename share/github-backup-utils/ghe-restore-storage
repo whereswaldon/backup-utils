@@ -24,7 +24,9 @@ GHE_HOSTNAME="$1"
 : ${GHE_RESTORE_SNAPSHOT:=current}
 
 # Find the objects to restore
-storage_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find storage -mindepth 4 -maxdepth 4 -type f -exec wc -c {} \;)
+# 20590 storage/d/da/5c/da5c7275ae360ef22756d5621ebb7853dea5869187274fcf2109ec70e9b9fd85
+# 1904640 storage/d/da/5c/da5ce86bcf54e3fadc75105e9bd734fccaaf64144dbd470dd40519a1c6efdf65
+storage_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/ && find -H storage -mindepth 4 -maxdepth 4 -type f -exec wc -c {} \;)
 
 # No need to restore anything, early exit
 if [ -z "$storage_paths" ]; then
@@ -78,7 +80,8 @@ trap 'cleanup' EXIT
 # b63c30f6f885e59282c2aa22cfca846516b5e72621c10a58140fb04d133e2c17 5592492
 # ...
 bm_start "$(basename $0) - Building object list"
-echo "$storage_paths" | awk '{print $2 " " $1}' | awk -F/ '{print $NF }' > $tmp_list
+# b8a48b6b122b4ef8175348d1d6fbd846d3b3ccc8fd7552b79f91125c4958e43b server1 server2 server3
+echo "$storage_paths" | awk -v nodes="$GHE_REMOTE_STORAGE_DATA_NODES" -F/ '{print $NF " " nodes}' > $routes_list
 bm_end "$(basename $0) - Building object list"
 
 # The server returns the list of servers where the objects will be sent:
@@ -94,49 +97,49 @@ bm_end "$(basename $0) - Building object list"
 # more performant than performing over an SSH pipe.
 #
 bm_start "$(basename $0) - Transferring object list"
-cat $tmp_list | ghe-ssh "$GHE_HOSTNAME" -- sponge $tmp_list
-ghe_debug "\n$(cat $tmp_list)"
+cat $routes_list | ghe-ssh "$GHE_HOSTNAME" -- sponge $routes_list
+ghe_debug "\n$(cat $routes_list)"
 bm_end "$(basename $0) - Transferring object list"
 
-bm_start "$(basename $0) - Generating routes"
-echo "cat $tmp_list | github-env ./bin/storage-cluster-restore-routes > $routes_list" | ghe-ssh "$GHE_HOSTNAME" /bin/bash
-ghe_debug "\n$(ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list)"
-bm_end "$(basename $0) - Generating routes"
+# bm_start "$(basename $0) - Generating routes"
+# echo "cat $tmp_list | github-env ./bin/storage-cluster-restore-routes > $routes_list" | ghe-ssh "$GHE_HOSTNAME" /bin/bash
+# ghe_debug "\n$(ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list)"
+# bm_end "$(basename $0) - Generating routes"
 
-bm_start "$(basename $0) - Fetching routes"
-ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list > $local_routes_list
-ghe_debug "\n$(cat $local_routes_list)"
-bm_end "$(basename $0) - Fetching routes"
+# bm_start "$(basename $0) - Fetching routes"
+# ghe-ssh "$GHE_HOSTNAME" -- cat $routes_list > $local_routes_list
+# ghe_debug "\n$(cat $local_routes_list)"
+# bm_end "$(basename $0) - Fetching routes"
 
-bm_start "$(basename $0) - Processing routes"
-cat $local_routes_list | awk -v tempdir="$tempdir" '{ for(i=2;i<=NF;i++){ print substr($1,1,1) "/" substr($1,1,2) "/" substr($1,3,2) "/" $1 > (tempdir"/"$i".rsync") }}'
-ghe_debug "\n$(ls -l $tempdir/*.rsync)"
-bm_end "$(basename $0) - Processing routes"
+# bm_start "$(basename $0) - Processing routes"
+# cat $local_routes_list | awk -v tempdir="$tempdir" '{ for(i=2;i<=NF;i++){ print substr($1,1,1) "/" substr($1,1,2) "/" substr($1,3,2) "/" $1 > (tempdir"/"$i".rsync") }}'
+# ghe_debug "\n$(ls -l $tempdir/*.rsync)"
+# bm_end "$(basename $0) - Processing routes"
 
-if ! ls $tempdir/*.rsync >/dev/null 2>&1; then
-  echo "Warning: no routes found, skipping storage restore ..."
-  exit 0
-fi
+# if ! ls $tempdir/*.rsync >/dev/null 2>&1; then
+#   echo "Warning: no routes found, skipping storage restore ..."
+#   exit 0
+# fi
 
 # rsync all the objects to the storage server where they belong.
 # One rsync invocation per server available.
-bm_start "$(basename $0) - Restoring objects"
-for file_list in $tempdir/*.rsync; do
-  if $CLUSTER; then
-    server=$(basename $file_list .rsync)
-  else
-    server=$host
-  fi
-  ghe_verbose "* Transferring data to $server ..."
-  ghe-rsync -arvHR --delete \
-    -e "ssh -q $opts -p $port $ssh_config_file_opt -l $user" \
-    --rsync-path="sudo -u git rsync" \
-    --files-from=$file_list \
-    --size-only \
-    "$GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/storage/./" \
-    "$server:$GHE_REMOTE_DATA_USER_DIR/storage/" 1>&3
-done
-bm_end "$(basename $0) - Restoring objects"
+# bm_start "$(basename $0) - Restoring objects"
+# for file_list in $tempdir/*.rsync; do
+#   if $CLUSTER; then
+#     server=$(basename $file_list .rsync)
+#   else
+#     server=$host
+#   fi
+#   ghe_verbose "* Transferring data to $server ..."
+#   ghe-rsync -arvHR --delete \
+#     -e "ssh -q $opts -p $port $ssh_config_file_opt -l $user" \
+#     --rsync-path="sudo -u git rsync" \
+#     --files-from=$file_list \
+#     --size-only \
+#     "$GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/storage/./" \
+#     "$server:$GHE_REMOTE_DATA_USER_DIR/storage/" 1>&3
+# done
+# bm_end "$(basename $0) - Restoring objects"
 
 if $CLUSTER; then
   bm_start "$(basename $0) - Finalizing routes"
