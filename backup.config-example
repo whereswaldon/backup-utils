@@ -52,7 +52,7 @@ GHE_NUM_SNAPSHOTS=10
 # The nodes which already have pre-populated repo / gist data.
 # Separate the nodes names with space.
 #
-#GHE_REMOTE_DATA_NODES="git-server-node1 git-server-node2 git-server-node3"
+#GHE_REMOTE_GIT_DATA_NODES="git-server-node1 git-server-node2 git-server-node3"
 
 # The nodes which already have pre-populated pages data.
 # Separate the nodes names with space.

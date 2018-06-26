@@ -91,7 +91,7 @@ for path in $network_paths; do
   # The network id from a repository is the last component of the path
   # i.e. /data/repositories/a/nw/a5/bf/c9/37 network ID would be 37
   ghe_verbose "* Adding network_path $path to the list of networks to send"
-  echo "$path $GHE_REMOTE_DATA_NODES"
+  echo "$path $GHE_REMOTE_GIT_DATA_NODES"
 # tmp_list has format
 # a/nw/a8/3f/02/100000855
 # a/nw/a8/bc/8d/100000880

@@ -79,7 +79,7 @@ bm_start "$(basename $0) - Building gist list"
 OLDIFS=$IFS; IFS=$'\n'
 for path in $gist_paths; do
   ghe_verbose "* Adding gist $path to the list of networks to send"
-  echo "$path $GHE_REMOTE_DATA_NODES"
+  echo "$path $GHE_REMOTE_GIT_DATA_NODES"
 done > $local_routes_list
 IFS=$OLDIFS
 bm_end "$(basename $0) - Building gist list"
