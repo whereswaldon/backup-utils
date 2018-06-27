@@ -56,7 +56,7 @@ for index in $indices; do
     if $CLUSTER || [ -n "$configured" ]; then
       ghe_verbose "* Restoring $index"
       cat $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/audit-log/$index.gz | ghe-ssh "$GHE_HOSTNAME" -- sponge $tempdir/$index.gz
-      ghe-ssh "$GHE_HOSTNAME" "gzip -dc $tempdir/$index.gz | /usr/local/share/enterprise/ghe-es-load-json 'http://localhost:9201/$index'" 1>&3
+      echo "set -o pipefail; gzip -dc $tempdir/$index.gz | /usr/local/share/enterprise/ghe-es-load-json 'http://localhost:9201/$index'" | ghe-ssh "$GHE_HOSTNAME" /bin/bash 1>&3
       ghe-ssh "$GHE_HOSTNAME" -- rm -f $tempdir/$index.gz
     else
       echo "$index.gz" >> $tmp_list
