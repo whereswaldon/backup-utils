@@ -115,7 +115,7 @@ bm_end "$(basename $0) - Transferring routes"
 
 bm_start "$(basename $0) - Processing routes"
 # cat $local_routes_list | awk -v tempdir="$tempdir" '{ for(i=2;i<=NF;i++){ print $1 > (tempdir"/"$i".rsync") }}'
-cat $local_routes_list | awk -v nodes="$GHE_REMOTE_GIT_DATA_NODES" '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); printf i " /data/repositories/" $1 " " nodes}' > $to_restore
+cat $local_routes_list | awk -v nodes="$GHE_REMOTE_GIT_DATA_NODES" '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); print i " /data/repositories/" $1 " " nodes}' > $to_restore
 ghe_debug "\n$(cat $to_restore)"
 bm_end "$(basename $0) - Processing routes"
 
