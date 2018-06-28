@@ -23,7 +23,7 @@ GHE_HOSTNAME="$1"
 : ${GHE_RESTORE_SNAPSHOT:=current}
 
 # Find the gists to restore
-gist_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/  && find repositories -mindepth 6 -maxdepth 7 -name \*.git | grep gist | cut -d / -f2-)
+gist_paths=$(cd $GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/  && find -H repositories -mindepth 6 -maxdepth 7 -name \*.git | grep gist | cut -d / -f2-)
 
 # No need to restore anything, early exit
 if [ -z "$gist_paths" ]; then
@@ -70,11 +70,8 @@ trap cleanup EXIT
 # Build a list of gist paths to send to the server to calculate
 # the restore routes, something like:
 #
-# a/a8/3f/02/gist
-# a/a8/bc/8d/gist
-# a/a5/06/81/gist
-# a/a5/84/6f/gist
-# a/a5/e0/01/gist
+# d/da/5c/b5/gist/25c7d0dc58b0c5e4d5843f66936f67b3.git
+# d/da/5c/17/gist/e9e73505fdad933e3739cfb86e9e75d7.git
 # ...
 #
 # One network path per line.
@@ -117,39 +114,15 @@ ghe_debug "\n$(cat $local_routes_list)"
 bm_end "$(basename $0) - Transferring routes"
 
 bm_start "$(basename $0) - Processing routes"
-cat $local_routes_list | awk -v tempdir="$tempdir" '{ for(i=2;i<=NF;i++){ print $1 > (tempdir"/"$i".rsync") }}'
-cat $local_routes_list | awk '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); printf i " /data/repositories/" $1; $1=""; print $0}' > $to_restore
-ghe_debug "\n$(ls -l $tempdir/*.rsync && cat $to_restore)"
+cat $local_routes_list | awk -v nodes="$GHE_REMOTE_GIT_DATA_NODES" '{ n = split($1, p, "/"); i = p[n]; sub(/\.git/, "", i); print i " /data/repositories/" $1 " " nodes}' > $to_restore
+ghe_debug "\n$(cat $to_restore)"
 bm_end "$(basename $0) - Processing routes"
-
-if ! ls $tempdir/*.rsync >/dev/null 2>&1; then
-  echo "Warning: no routes found, skipping gists restore ..."
-  exit 0
-fi
-
-# rsync all the gist repositories
-bm_start "$(basename $0) - Restoring gists"
-for file_list in $tempdir/*.rsync; do
-  if $CLUSTER; then
-    server=$(basename $file_list .rsync)
-  else
-    server=$host
-  fi
-  ghe_verbose "* Transferring gists to $server"
-  ghe-rsync -avrHR --delete \
-    -e "ssh -q $opts -p $port $ssh_config_file_opt -l $user" \
-    --rsync-path="sudo -u git rsync" \
-    --files-from=$file_list \
-    "$GHE_DATA_DIR/$GHE_RESTORE_SNAPSHOT/repositories/./" \
-    "$server:$GHE_REMOTE_DATA_USER_DIR/repositories/" 1>&3
-done
-bm_end "$(basename $0) - Restoring gists"
 
 if $CLUSTER; then
   bm_start "$(basename $0) - Finalizing routes"
   ghe_verbose "Finalizing routes"
   cat $to_restore | ghe-ssh "$GHE_HOSTNAME" -- sponge $to_restore
-  ghe-ssh "$GHE_HOSTNAME" -- /bin/bash >&3 <<EOF
+  ghe-ssh "$GHE_HOSTNAME" -- /bin/bash >&3 2>&3 <<EOF
     split -l 1000 $to_restore $tempdir/chunk
     chunks=\$(find $tempdir/ -name chunk\*)
     parallel -i /bin/sh -c "cat {} | github-env ./bin/gist-cluster-restore-finalize" -- \$chunks
