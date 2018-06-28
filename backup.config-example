@@ -48,3 +48,18 @@ GHE_NUM_SNAPSHOTS=10
 #
 # WARNING: do not enable this, only useful for debugging/development
 #GHE_BACKUP_FSCK=no
+
+# The nodes which already have pre-populated repo / gist data.
+# Separate the nodes names with space.
+#
+#GHE_REMOTE_GIT_DATA_NODES="git-server-node1 git-server-node2 git-server-node3"
+
+# The nodes which already have pre-populated pages data.
+# Separate the nodes names with space.
+#
+#GHE_REMOTE_PAGES_DATA_NODES="pages-server-node1 pages-server-node2 pages-server-node3"
+
+# The nodes which already have pre-populated storage data.
+# Separate the nodes names with space.
+#
+#GHE_REMOTE_STORAGE_DATA_NODES="storage-server-node1 storage-server-node2 storage-server-node3"
